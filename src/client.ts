@@ -129,7 +129,11 @@ export class WordPressClient {
     };
     const ext = extMap[contentType] ?? ".jpg";
     const urlPath = new URL(data.url).pathname;
-    const baseName = urlPath.split("/").pop()?.replace(/\.[^.]+$/, "") ?? `upload-${Date.now()}`;
+    const baseName =
+      urlPath
+        .split("/")
+        .pop()
+        ?.replace(/\.[^.]+$/, "") ?? `upload-${Date.now()}`;
     const filename = baseName.includes(".") ? baseName : `${baseName}${ext}`;
 
     const uploadUrl = `${this.baseUrl}/media`;

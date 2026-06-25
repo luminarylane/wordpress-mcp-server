@@ -64,6 +64,7 @@ npm run build
 ### Configuration
 
 **Claude Desktop (`claude_desktop_config.json`):**
+
 ```json
 {
   "mcpServers": {
@@ -82,12 +83,12 @@ npm run build
 
 **Environment variables:**
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `WORDPRESS_URL` | Yes | Your WordPress site URL (e.g., `https://example.com`) |
-| `WORDPRESS_USERNAME` | Yes | WordPress username |
-| `WORDPRESS_APP_PASSWORD` | Yes | Application Password (spaces are stripped automatically) |
-| `LOG_LEVEL` | No | Logging level (default: `info`) |
+| Variable                 | Required | Description                                              |
+| ------------------------ | -------- | -------------------------------------------------------- |
+| `WORDPRESS_URL`          | Yes      | Your WordPress site URL (e.g., `https://example.com`)    |
+| `WORDPRESS_USERNAME`     | Yes      | WordPress username                                       |
+| `WORDPRESS_APP_PASSWORD` | Yes      | Application Password (spaces are stripped automatically) |
+| `LOG_LEVEL`              | No       | Logging level (default: `info`)                          |
 
 ## Usage Examples
 
