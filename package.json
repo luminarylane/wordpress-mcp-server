@@ -1,6 +1,6 @@
 {
   "name": "wordpress-mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "WordPress MCP Server — blog publishing via REST API + Application Passwords",
   "type": "module",
   "main": "dist/index.js",
