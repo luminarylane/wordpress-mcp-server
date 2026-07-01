@@ -11,23 +11,25 @@ A Model Context Protocol (MCP) server that connects Claude Desktop (and other MC
 ### 11 WordPress Tools
 
 **SENSE (read-only):**
-| Tool | Description |
-|------|-------------|
-| `wp_get_site_info` | Site information — name, URL, description, namespaces, auth status |
-| `wp_list_posts` | List posts filtered by status, keyword search |
-| `wp_get_post` | Full post content, title, status, categories, tags, metadata |
-| `wp_list_comments` | Comments on posts, optionally filtered by post ID |
-| `wp_list_categories` | List categories (find IDs before creating posts) |
-| `wp_list_tags` | List tags (find IDs before creating posts) |
+
+| Tool                 | Description                                                        |
+| -------------------- | ------------------------------------------------------------------ |
+| `wp_get_site_info`   | Site information — name, URL, description, namespaces, auth status |
+| `wp_list_posts`      | List posts filtered by status, keyword search                      |
+| `wp_get_post`        | Full post content, title, status, categories, tags, metadata       |
+| `wp_list_comments`   | Comments on posts, optionally filtered by post ID                  |
+| `wp_list_categories` | List categories (find IDs before creating posts)                   |
+| `wp_list_tags`       | List tags (find IDs before creating posts)                         |
 
 **ACT (write):**
-| Tool | Description |
-|------|-------------|
-| `wp_create_post` | Create a new post (defaults to draft — human review before publish) |
-| `wp_update_post` | Update an existing post (also how you publish a draft) |
-| `wp_delete_post` | Delete a post by ID (irreversible) |
-| `wp_create_comment` | Create a comment on a post |
-| `wp_upload_media` | Upload an image from URL to the media library |
+
+| Tool                | Description                                                         |
+| ------------------- | ------------------------------------------------------------------- |
+| `wp_create_post`    | Create a new post (defaults to draft — human review before publish) |
+| `wp_update_post`    | Update an existing post (also how you publish a draft)              |
+| `wp_delete_post`    | Delete a post by ID (irreversible)                                  |
+| `wp_create_comment` | Create a comment on a post                                          |
+| `wp_upload_media`   | Upload an image from URL to the media library                       |
 
 ### Built-in Reliability
 
