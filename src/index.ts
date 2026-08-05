@@ -11,6 +11,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import logger from "./lib/logger.js";
+import { getSessionTrace, flushLangfuse, shutdownLangfuse } from "./lib/langfuse.js";
 import { WordPressClient } from "./client.js";
 import { textResult, errorResult, senseResult } from "./response.js";
 import {
@@ -62,23 +63,31 @@ type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResult>;
 
 function safeHandler(toolName: string, fn: ToolHandler) {
   return async (args: Record<string, unknown>): Promise<ToolResult> => {
+    const trace = getSessionTrace();
+    const span = trace?.span({ name: `tool:${toolName}`, input: args });
     const category = WRITE_TOOL_NAMES.has(toolName) ? "write" : "read";
 
     const limit = await waitForRateLimit(category);
     if (!limit.allowed) {
       const retryAfterSeconds = Math.ceil(limit.retryAfterMs / 1000);
-      return errorResult(
+      const result = errorResult(
         "Rate limited",
         `WordPress API rate limit reached. Retry after ${retryAfterSeconds} seconds.`,
         { retryAfterSeconds },
       );
+      span?.update({ output: { error: "Rate limited", retryAfterSeconds }, level: "WARNING" });
+      span?.end();
+      return result;
     }
 
     try {
       const wp = ensureClient();
-      return await withRetry(() => fn.call(null, { ...args, _client: wp }));
+      const result = await withRetry(() => fn.call(null, { ...args, _client: wp }));
+      span?.update({ output: result });
+      return result;
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
+      span?.update({ output: { error: message }, level: "ERROR" });
 
       // Parse WordPress REST API errors for actionable messages
       if (message.includes("WordPress API 401")) {
@@ -117,6 +126,8 @@ function safeHandler(toolName: string, fn: ToolHandler) {
       }
 
       return errorResult("WordPress API error", message);
+    } finally {
+      span?.end();
     }
   };
 }
@@ -144,30 +155,19 @@ server.tool(
   "wp_list_posts",
   "List WordPress posts. Use status='draft' to see drafts, status='publish' for published. Returns title, ID, status, date, and excerpt.",
   {
-    per_page: z
-      .number()
-      .optional()
-      .describe("Number of posts to return (default 10, max 100)"),
-    status: z
-      .string()
-      .optional()
-      .describe(
-        "Filter by status: publish, draft, pending, private (default: publish)",
-      ),
+    per_page: z.number().optional().describe("Number of posts to return (default 10, max 100)"),
+    status: z.string().optional().describe("Filter by status: publish, draft, pending, private (default: publish)"),
     search: z.string().optional().describe("Search posts by keyword"),
   },
-  safeHandler(
-    "wp_list_posts",
-    async ({ _client, per_page, status, search }) => {
-      const wp = _client as WordPressClient;
-      const posts = await wp.listPosts({
-        per_page: per_page as number | undefined,
-        status: status as string | undefined,
-        search: search as string | undefined,
-      });
-      return senseResult(posts, "WordPress");
-    },
-  ),
+  safeHandler("wp_list_posts", async ({ _client, per_page, status, search }) => {
+    const wp = _client as WordPressClient;
+    const posts = await wp.listPosts({
+      per_page: per_page as number | undefined,
+      status: status as string | undefined,
+      search: search as string | undefined,
+    });
+    return senseResult(posts, "WordPress");
+  }),
 );
 
 server.tool(
@@ -188,10 +188,7 @@ server.tool(
   "List comments on WordPress posts. Optionally filter by post ID.",
   {
     post: z.number().optional().describe("Filter comments by post ID"),
-    per_page: z
-      .number()
-      .optional()
-      .describe("Number of comments to return (default 10, max 100)"),
+    per_page: z.number().optional().describe("Number of comments to return (default 10, max 100)"),
   },
   safeHandler("wp_list_comments", async ({ _client, post, per_page }) => {
     const wp = _client as WordPressClient;
@@ -207,10 +204,7 @@ server.tool(
   "wp_list_categories",
   "List WordPress categories. Use to find category IDs before creating posts.",
   {
-    per_page: z
-      .number()
-      .optional()
-      .describe("Number of categories to return (default 10, max 100)"),
+    per_page: z.number().optional().describe("Number of categories to return (default 10, max 100)"),
     search: z.string().optional().describe("Search categories by name"),
   },
   safeHandler("wp_list_categories", async ({ _client, per_page, search }) => {
@@ -227,10 +221,7 @@ server.tool(
   "wp_list_tags",
   "List WordPress tags. Use to find tag IDs before creating posts.",
   {
-    per_page: z
-      .number()
-      .optional()
-      .describe("Number of tags to return (default 10, max 100)"),
+    per_page: z.number().optional().describe("Number of tags to return (default 10, max 100)"),
     search: z.string().optional().describe("Search tags by name"),
   },
   safeHandler("wp_list_tags", async ({ _client, per_page, search }) => {
@@ -250,15 +241,11 @@ server.tool(
   "Create a new WordPress blog post. Content should be HTML. ALWAYS set status='draft' unless explicitly told to publish — human review before going live.",
   {
     title: z.string().describe("Post title"),
-    content: z
-      .string()
-      .describe("Post content in HTML — use <h2>, <h3>, <p>, <ul> etc."),
+    content: z.string().describe("Post content in HTML — use <h2>, <h3>, <p>, <ul> etc."),
     status: z
       .enum(["draft", "publish", "pending", "private"])
       .optional()
-      .describe(
-        "Post status (default: draft). ALWAYS use 'draft' unless explicitly told to publish.",
-      ),
+      .describe("Post status (default: draft). ALWAYS use 'draft' unless explicitly told to publish."),
     categories: z
       .array(z.number())
       .optional()
@@ -270,33 +257,20 @@ server.tool(
     featured_media: z
       .number()
       .optional()
-      .describe(
-        "Media ID for featured/hero image — upload first with wp_upload_media, then pass the returned ID here",
-      ),
+      .describe("Media ID for featured/hero image — upload first with wp_upload_media, then pass the returned ID here"),
   },
-  safeHandler(
-    "wp_create_post",
-    async ({
-      _client,
-      title,
-      content,
-      status,
-      featured_media,
-      categories,
-      tags,
-    }) => {
-      const wp = _client as WordPressClient;
-      const post = await wp.createPost({
-        title: title as string,
-        content: content as string,
-        status: (status as string) ?? "draft",
-        featured_media: featured_media as number | undefined,
-        categories: categories as number[] | undefined,
-        tags: tags as number[] | undefined,
-      });
-      return textResult(post);
-    },
-  ),
+  safeHandler("wp_create_post", async ({ _client, title, content, status, featured_media, categories, tags }) => {
+    const wp = _client as WordPressClient;
+    const post = await wp.createPost({
+      title: title as string,
+      content: content as string,
+      status: (status as string) ?? "draft",
+      featured_media: featured_media as number | undefined,
+      categories: categories as number[] | undefined,
+      tags: tags as number[] | undefined,
+    });
+    return textResult(post);
+  }),
 );
 
 server.tool(
@@ -312,35 +286,20 @@ server.tool(
       .describe("New post status"),
     categories: z.array(z.number()).optional().describe("New category IDs"),
     tags: z.array(z.number()).optional().describe("New tag IDs"),
-    featured_media: z
-      .number()
-      .optional()
-      .describe("Media ID for featured image — use wp_upload_media first"),
+    featured_media: z.number().optional().describe("Media ID for featured image — use wp_upload_media first"),
   },
-  safeHandler(
-    "wp_update_post",
-    async ({
-      _client,
-      id,
-      title,
-      content,
-      status,
-      featured_media,
-      categories,
-      tags,
-    }) => {
-      const wp = _client as WordPressClient;
-      const data: Record<string, unknown> = {};
-      if (title !== undefined) data.title = title;
-      if (content !== undefined) data.content = content;
-      if (status !== undefined) data.status = status;
-      if (featured_media !== undefined) data.featured_media = featured_media;
-      if (categories !== undefined) data.categories = categories;
-      if (tags !== undefined) data.tags = tags;
-      const post = await wp.updatePost(id as number, data);
-      return textResult(post);
-    },
-  ),
+  safeHandler("wp_update_post", async ({ _client, id, title, content, status, featured_media, categories, tags }) => {
+    const wp = _client as WordPressClient;
+    const data: Record<string, unknown> = {};
+    if (title !== undefined) data.title = title;
+    if (content !== undefined) data.content = content;
+    if (status !== undefined) data.status = status;
+    if (featured_media !== undefined) data.featured_media = featured_media;
+    if (categories !== undefined) data.categories = categories;
+    if (tags !== undefined) data.tags = tags;
+    const post = await wp.updatePost(id as number, data);
+    return textResult(post);
+  }),
 );
 
 server.tool(
@@ -349,33 +308,24 @@ server.tool(
   {
     post: z.number().describe("Post ID to comment on"),
     content: z.string().describe("Comment text"),
-    author_name: z
-      .string()
-      .optional()
-      .describe("Comment author name (if not logged in)"),
-    author_email: z
-      .string()
-      .optional()
-      .describe("Comment author email (if not logged in)"),
+    author_name: z.string().optional().describe("Comment author name (if not logged in)"),
+    author_email: z.string().optional().describe("Comment author email (if not logged in)"),
   },
-  safeHandler(
-    "wp_create_comment",
-    async ({ _client, post, content, author_name, author_email }) => {
-      const wp = _client as WordPressClient;
-      const comment = await wp.createComment({
-        post: post as number,
-        content: content as string,
-        author_name: author_name as string | undefined,
-        author_email: author_email as string | undefined,
-      });
-      return textResult(comment);
-    },
-  ),
+  safeHandler("wp_create_comment", async ({ _client, post, content, author_name, author_email }) => {
+    const wp = _client as WordPressClient;
+    const comment = await wp.createComment({
+      post: post as number,
+      content: content as string,
+      author_name: author_name as string | undefined,
+      author_email: author_email as string | undefined,
+    });
+    return textResult(comment);
+  }),
 );
 
 server.tool(
   "wp_delete_post",
-  "Delete a WordPress post by ID. This is irreversible.",
+  "Delete a WordPress post by ID. Use when GSC data shows the post is hurting SEO (thin content, keyword cannibalization) or when content is outdated. This is irreversible.",
   {
     id: z.number().describe("Post ID to delete"),
   },
@@ -390,27 +340,21 @@ server.tool(
   "wp_upload_media",
   "Upload an image to WordPress media library from a URL. Returns the media ID which can be used as featured_media when creating or updating posts. Use for featured images (1200x630 landscape for OG tags) and inline images.",
   {
-    url: z.string().describe("URL of the image to upload"),
+    url: z.string().describe("URL of the image to upload (e.g., from Media MCP generation)"),
     title: z.string().optional().describe("Media title for WordPress library"),
-    alt_text: z
-      .string()
-      .optional()
-      .describe("Alt text for accessibility and SEO"),
+    alt_text: z.string().optional().describe("Alt text for accessibility and SEO"),
     caption: z.string().optional().describe("Image caption"),
   },
-  safeHandler(
-    "wp_upload_media",
-    async ({ _client, url, title, alt_text, caption }) => {
-      const wp = _client as WordPressClient;
-      const media = await wp.uploadMedia({
-        url: url as string,
-        title: title as string | undefined,
-        alt_text: alt_text as string | undefined,
-        caption: caption as string | undefined,
-      });
-      return textResult(media);
-    },
-  ),
+  safeHandler("wp_upload_media", async ({ _client, url, title, alt_text, caption }) => {
+    const wp = _client as WordPressClient;
+    const media = await wp.uploadMedia({
+      url: url as string,
+      title: title as string | undefined,
+      alt_text: alt_text as string | undefined,
+      caption: caption as string | undefined,
+    });
+    return textResult(media);
+  }),
 );
 
 // ── Start ──────────────────────────────────────────────
@@ -431,7 +375,9 @@ async function main() {
   logger.error("Ready for MCP client");
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
+  await flushLangfuse();
+  await shutdownLangfuse();
   logger.error({ err: error }, "Fatal error");
   process.exit(1);
 });
