@@ -59,7 +59,7 @@ A Model Context Protocol (MCP) server that connects Claude Desktop (and other MC
 Run directly with npx (pin a version in production):
 
 ```bash
-npx --yes @luminarylane/wordpress-mcp-server@1.0.2
+npx --yes @luminarylane/wordpress-mcp-server@1.0.3
 ```
 
 ### Configuration
@@ -71,7 +71,7 @@ npx --yes @luminarylane/wordpress-mcp-server@1.0.2
   "mcpServers": {
     "wordpress": {
       "command": "npx",
-      "args": ["--yes", "@luminarylane/wordpress-mcp-server@1.0.2"],
+      "args": ["--yes", "@luminarylane/wordpress-mcp-server@1.0.3"],
       "env": {
         "WORDPRESS_URL": "https://your-site.com",
         "WORDPRESS_USERNAME": "admin",

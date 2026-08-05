@@ -1,6 +1,6 @@
 {
   "name": "@luminarylane/wordpress-mcp-server",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "WordPress MCP Server — blog publishing via REST API + Application Passwords",
   "type": "module",
   "main": "dist/index.js",
