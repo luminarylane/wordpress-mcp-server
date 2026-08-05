@@ -1,20 +1,38 @@
 {
-  "name": "wordpress-mcp-server",
-  "version": "1.0.1",
+  "name": "@luminarylane/wordpress-mcp-server",
+  "version": "1.0.0",
   "description": "WordPress MCP Server — blog publishing via REST API + Application Passwords",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "wordpress-mcp-server": "dist/index.js"
+    "luminarylane-wordpress-mcp": "dist/index.js"
   },
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check": "npm test && npm run build"
+  },
+  "files": ["dist", "README.md", "LICENSE", "SECURITY.md"],
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luminarylane/wordpress-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luminarylane/wordpress-mcp-server/issues"
+  },
+  "homepage": "https://github.com/luminarylane/wordpress-mcp-server#readme",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "langfuse": "^3.38.20",
     "pino": "^10.3.1",
     "zod": "^4.1.5"
   },

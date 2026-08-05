@@ -42,7 +42,7 @@ A Model Context Protocol (MCP) server that connects Claude Desktop (and other MC
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22.14+
 - A self-hosted WordPress 5.6+ site (WordPress.com hosted sites are not supported)
 - An [Application Password](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/) for your WordPress user
 
@@ -56,11 +56,10 @@ A Model Context Protocol (MCP) server that connects Claude Desktop (and other MC
 
 ### Installation
 
+Run directly with npx (pin a version in production):
+
 ```bash
-git clone https://github.com/luminarylane/wordpress-mcp-server.git
-cd wordpress-mcp-server
-npm install
-npm run build
+npx --yes @luminarylane/wordpress-mcp-server@1.0.0
 ```
 
 ### Configuration
@@ -71,8 +70,8 @@ npm run build
 {
   "mcpServers": {
     "wordpress": {
-      "command": "node",
-      "args": ["/path/to/wordpress-mcp-server/dist/index.js"],
+      "command": "npx",
+      "args": ["--yes", "@luminarylane/wordpress-mcp-server@1.0.0"],
       "env": {
         "WORDPRESS_URL": "https://your-site.com",
         "WORDPRESS_USERNAME": "admin",
