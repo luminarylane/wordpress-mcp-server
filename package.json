@@ -1,6 +1,6 @@
 {
   "name": "@luminarylane/wordpress-mcp-server",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "WordPress MCP Server — blog publishing via REST API + Application Passwords",
   "type": "module",
   "main": "dist/index.js",
@@ -14,7 +14,12 @@
     "test": "vitest run",
     "check": "npm test && npm run build"
   },
-  "files": ["dist", "README.md", "LICENSE", "SECURITY.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
   "engines": {
     "node": ">=22.14.0"
   },
